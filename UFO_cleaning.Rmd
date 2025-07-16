@@ -1,0 +1,124 @@
+---
+title: "UFO Data Cleaning"
+author: "Carrie Wright"
+date: "2025-06-24"
+output: 
+  html_document:
+    code_folding: hide
+    
+---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+
+## Load our tools and data
+
+
+First we need to load our tools - including the tidyverse and also read in the data, which we can do directly from a link. 
+
+```{r}
+library(tidyverse)
+library(DT)
+UFO <- read_csv(file = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQp2WUFRZVTbmmJpvsP8CTNrk7EAMbSP9uPp_Doj6FMHAwyuZzasNrAEXcnf8dYBFElO-EHwiOmEsQd/pub?output=csv")
+```
+
+R allows us to check for any strange values, differences in column numbers etc. when we load the data. 
+```{r}
+problems(UFO)
+```
+
+Let's see if we see that in the Google Sheets version:
+
+Row 30894: https://docs.google.com/spreadsheets/d/1T2ix2WGEsBXlsnowuu9GRyBVBgbIzid5CRsB4WQQyU4/edit?gid=49749752#gid=49749752&range=F30894
+
+Row 39616: https://docs.google.com/spreadsheets/d/1T2ix2WGEsBXlsnowuu9GRyBVBgbIzid5CRsB4WQQyU4/edit?gid=49749752#gid=49749752&range=F39616
+
+Row 65125:https://docs.google.com/spreadsheets/d/1T2ix2WGEsBXlsnowuu9GRyBVBgbIzid5CRsB4WQQyU4/edit?gid=49749752#gid=49749752&range=F65125
+
+These would have been hard to find in Excel or Google Sheets!
+
+# Examine the data
+
+R has many useful ways of viewing data. Say we want to see how many unique values there are for the categorical variables.
+
+```{r}
+count(UFO, city) %>% datatable()
+count(UFO, state) %>% datatable()
+count(UFO, country)
+count(UFO, shape)%>% datatable()
+```
+We notice that not all of the column D `country` data is complete the 3rd row says `tx` but doesn't have a country value. 
+
+
+If we look up "Lackland afb" we see that it is indeed a real air force base in Texas in the United States. 
+
+
+Let's try to save these rows where we have state data but we dont have country data.
+
+We can use a list of state abbreviations that is already in R to do this! We will change the format so it matches the lowercase format in our data.
+
+```{r}
+lower_states <-tolower(state.abb)
+lower_states
+```
+
+
+Let's take a look at more of these situations:
+
+```{r}
+filter(UFO, state %in% lower_states & is.na(country)) %>% datatable()
+```
+
+
+Now let's make a new country column based on the state column and if it matches the values in this list of state abbreviations `lower_states` and if it doesn't match we will have it keep the original country column value (which will be useful for values from Australia etc.)
+
+
+
+```{r}
+UFO <- UFO %>% mutate(
+  country_new = case_when(state %in% lower_states ~ "US",
+                                       .default = country
+                          ))
+UFO <- UFO %>% relocate(country_new, .before = country)
+
+head(UFO)
+```
+
+Now let's filter for the US data. First let's try for the old version of the data which was missing `us` for some rows.
+
+Let's see how many rows/sightings there are.
+
+```{r}
+filter(UFO, country == "us") %>% nrow() 
+```
+
+
+Now let's do it for the new country column.
+Let's see how many rows/sightings there are.
+
+```{r}
+filter(UFO, country_new == "US") %>% nrow()
+```
+
+
+Wow, we saved a lot of United States sightings from being missed!
+
+Now let's say we wanted only sightings from this October 2010 in the US. This could be kinda tricky in Excel or Google Sheets.
+
+```{r}
+US_2014 <-filter(UFO, str_detect(datetime, "2014") & country_new == "US")
+
+US_2014
+```
+
+Now let's save what we have done, so we can use our cleaned data next time. We can save it as an R object so it is faster to import next time. Let's save all 3 objects that we created. 
+
+```{r}
+write_rds(UFO, file = "UFO_clean.rds")
+write_rds(US_2014, file = "UFO_2014.rds")
+write_rds(lower_states, file = "lower_states.rds")
+```
+
+

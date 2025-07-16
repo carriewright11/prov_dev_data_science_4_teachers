@@ -1,0 +1,270 @@
+---
+title: "UFO Data Vizualization"
+author: "Carrie"
+date: "2025-07-09"
+output: html_document
+---
+
+## Load our tools and data
+
+
+First we need to load our tools - including the tidyverse and also read in the data, which we can do directly from a link. 
+
+```{r}
+library(tidyverse)
+library(DT)
+UFO <- read_rds("UFO_clean.rds")
+US_2014 <- read_rds("UFO_2014.rds")
+lower_states <- read_rds("lower_states.rds")
+```
+
+# Start plotting!
+
+Now let's make some plots and see what is possible in R.
+
+Perhaps we are curious about how often each of the different shapes of UFOs were sighted. 
+
+```{r}
+ggplot(US_2014, aes(x = shape, fill = shape)) + geom_bar() 
+```
+
+We can see that many of these shapes are rather similar, like other, unknown,  and NA or oval. circle, disk, egg, and sphere, or even flash, light, and fireball. Let's simplify these categories but only do it just before the plot, let's not change our data.
+
+```{r}
+US_2014 %>% mutate(shape = case_when( 
+              shape %in% c("circle", "disk", "egg", "oval", "sphere") ~ "circular",
+              shape %in% c("flash", "light", "fireball") ~ "light/fire",
+              shape %in% c("other", "unknown", NA)~ "NA",
+              shape %in% c("cylinder", "cigar") ~ "cylindrical",
+              .default = shape)) %>%
+  
+ggplot(aes(x = shape, fill = shape)) + geom_bar() 
+
+```
+
+Nice, let's also organize the columns.
+
+```{r}
+library(forcats)
+US_2014 %>% mutate(shape = case_when( 
+              shape %in% c("circle", "disk", "egg", "oval", "sphere") ~ "circular",
+              shape %in% c("flash", "light", "fireball") ~ "light/fire",
+              shape %in% c("other", "unknown","formation") |is.na(shape) ~ "unknown",
+              shape %in% c("cylinder", "cigar") ~ "cylindrical",
+              .default = shape)) %>% 
+          mutate(shape = factor(shape)) %>% group_by(shape) %>%summarise(frequency = n()) %>%
+  
+ggplot(aes(x = fct_reorder(shape, frequency), y = frequency, fill = shape)) + geom_col()+
+  labs(x = "Shape of UFO", y = "Mumber of sightings", title = "Number of UFO sightings by shape")+ 
+  theme(legend.position = "none")
+
+```
+
+
+Now we can clearly see that most sightings have some sort of circular shape or a flash of light.
+
+Next, maybe we are wondering which states have the most sightings.
+
+```{r}
+US_2014 %>% group_by(state) %>% summarise(frequency = n()) %>% arrange(desc(frequency)) %>% mutate(percent = (frequency/sum(frequency)*100)) %>%
+  ggplot(aes(x = as_factor(state), y = frequency))+ geom_col(fill = "blue") + theme_linedraw()+
+  labs(x = "Frequency of UFO Sightings", y = "State")
+  
+```
+
+
+Let's say we were really interested in NM becuase of Roswell.
+```{r}
+
+US_2014 %>% group_by(state) %>% summarise(frequency = n()) %>% arrange(desc(frequency)) %>% mutate(percent = (frequency/sum(frequency)*100)) %>%
+mutate(fill_color = case_when(state =="nm" ~"nm", .default = "not_nm"))%>%
+  ggplot(aes(x = as_factor(state), y = frequency, fill = fill_color))+ geom_col() + theme_linedraw()+
+  labs(y = "Frequency of UFO Sightings", x = "State") + theme(legend.position = "none")
+  
+```
+
+
+```{r}
+library(maps)
+state_sightings <- US_2014 %>% group_by(state) %>% summarise(frequency = n())
+
+# Get the map data for the US
+us_map <- map_data("state")
+state_names <- tibble(state = tolower(state.name), abrev = tolower(state.abb))
+us_map <-full_join(us_map, state_names,  by = c("region" = "state") )
+
+# Merge the sightings data with the map data
+us_map <- us_map %>%
+  full_join(state_sightings, by = c("abrev" = "state"))
+
+# Create the heat map
+ggplot(data = us_map, aes(x = long, y = lat, group = group, fill = frequency)) +
+  geom_polygon(color = "white") +
+  coord_fixed(1.3) +
+  theme_minimal() +
+  labs(title = "UFO Sightings in the US in 2014", fill = "Number of Sightings") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", na.value = "white") + theme_void()
+```
+
+
+range of dates
+
+```{r}
+UFO_time <-UFO %>% separate(datetime,into = c("date", "time"), sep = " ") %>% mutate(date = mdy(date)) %>% separate(time, into= c("hour", "min")) %>% mutate(hour = as.numeric(hour), min = as.numeric(min)) %>% filter(hour <=24)
+
+
+UFO_time <- UFO_time %>%   mutate(timespan = case_when(hour %in%c(18,19,20,21)~ "Evening", 
+                              hour >21 ~ "Night",
+                              hour >=0 & hour <12 ~ "Morning",
+                              hour >=12 & hour <18 ~ "Afternoon"))
+summarized_data <-UFO_time%>% group_by(hour, timespan) %>% summarize(frequency = n())
+
+ggplot() +geom_point(data =summarized_data, aes(y = frequency, x = hour))
+
+# Create a data frame for the rectangles
+rectangles <- data.frame(
+  xmin = c(0, 12, 18, 21),
+  xmax = c(12, 18, 21, 24),
+  ymin = 0,
+  ymax = max(summarized_data$frequency),
+  timespan = c("Morning", "Afternoon", "Evening", "Night")  # Adjust accordingly
+)
+
+# Plot
+
+summarized_data  <-mutate(summarized_data, time_regular = case_when(
+    hour == 0 ~ "12 AM",
+    hour < 12 ~ paste0(hour, " AM"),
+    hour == 12 ~ "12 PM",
+    TRUE ~ paste0(hour - 12, " PM")
+  ))
+
+summarized_data  <-summarized_data %>% mutate(time_regular = as.factor(time_regular))
+ggplot() +   geom_rect(data = rectangles, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = timespan), alpha = 0.2)+geom_point(data =summarized_data, aes(y = frequency, x = time_regular))
+  labs(x = "Hour", y = "Frequency") +
+  theme_linedraw()
+
+
+```
+
+
+How does this compare if we include all the dates in the dataset:
+
+```{r}
+library(maps)
+state_sightings <- UFO %>% filter(country_new=="US") %>% group_by(state) %>% summarise(frequency = n())
+
+# Get the map data for the US
+us_map <- map_data("state")
+state_names <- tibble(state = tolower(state.name), abrev = tolower(state.abb))
+us_map <-full_join(us_map, state_names,  by = c("region" = "state") )
+
+# Merge the sightings data with the map data
+us_map <- us_map %>%
+  full_join(state_sightings, by = c("abrev" = "state"))
+
+# Create the heat map
+ggplot(data = us_map, aes(x = long, y = lat, group = group, fill = frequency)) +
+  geom_polygon(color = "white") +
+  coord_fixed(1.3) +
+  theme_minimal() +
+  labs(title = "UFO Sightings in the US through 2014", fill = "Number of Sightings") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", na.value = "white") + theme_void()
+
+
+```
+
+
+```{r}
+library(plotly)
+
+nm_map <- map_data("state", region = "new mexico")
+md_map <- map_data("state", region = "maryland")
+viz <- UFO %>% 
+  filter(country_new == "US", state == "nm", str_detect(datetime, "2014")) %>% 
+  group_by(city) %>% 
+  mutate(city_frequency = n()) %>% 
+  ungroup() %>%
+  ggplot(aes(as.numeric(longitude), as.numeric(latitude))) +
+  geom_polygon(data = nm_map, aes(x = long, y = lat), fill = NA, color = "black") +  # New Mexico borders
+  coord_equal() +
+  geom_point(aes(text = comments, size = city_frequency), colour = "red", alpha = 1/2)
+
+
+viz <- UFO %>% 
+  filter(country_new == "US", state == "nm", as.numeric(longitude) < -90) %>% 
+  group_by(city) %>% 
+  mutate(city_frequency = n()) %>% 
+  ungroup() %>%
+  ggplot(aes(as.numeric(longitude), as.numeric(latitude))) +
+  geom_polygon(data = nm_map, aes(x = long, y = lat), fill = NA, color = "black") +  # New Mexico borders
+  coord_equal() +
+  geom_point(aes(text = c(comments), size = city_frequency), colour = "red", alpha = 1/2)
+
+ggplotly(viz, tooltip = c("text", "size"))
+
+
+
+viz <- UFO %>% 
+  filter(country_new == "US", state == "md", str_detect(datetime, "2014")) %>% 
+  group_by(city) %>% 
+  mutate(city_frequency = n()) %>% 
+  ungroup() %>%
+  ggplot(aes(as.numeric(longitude), as.numeric(latitude))) +
+  geom_polygon(data = md_map, aes(x = long, y = lat), fill = NA, color = "black") +  # New Mexico borders
+  coord_equal() +
+  geom_point(aes(text = c(comments), size = city_frequency), colour = "red", alpha = 1/2)
+
+ggplotly(viz, tooltip = c("text", "size"))
+
+```
+
+
+```{r}
+
+make_ufo_state_map_city<-function(state_for_map){
+ state_map <- map_data("state", region = state_for_map)
+ state_abv <- state_names %>% filter(state== state_for_map) %>% pull(abrev)
+  viz <- UFO %>% 
+  filter(country_new == "US", state == state_abv, str_detect(datetime, "2014")) %>% 
+  filter(longitude>= min(state_map$long) & latitude <=max(state_map$lat)) %>%
+  group_by(city) %>% 
+  mutate(city_frequency = n()) %>% 
+  ungroup() %>%
+  ggplot(aes(as.numeric(longitude), as.numeric(latitude))) +
+  geom_polygon(data = state_map, aes(x = long, y = lat), fill = NA, color = "black") +  # state borders
+  coord_equal() +
+  geom_point(aes(text = city, size = city_frequency), colour = "red", alpha = 1/2)+
+    xlim(min(state_map$long), max(state_map$long))+ ylim(min(state_map$lat), max(state_map$lat)) +
+    theme_void() + theme(axis.line = element_blank())
+
+ggplotly(viz, tooltip = c("text", "size"))
+}
+
+
+make_ufo_state_map_comments<-function(state_for_map){
+ state_map <- map_data("state", region = state_for_map)
+ state_abv <- state_names %>% filter(state== state_for_map) %>% pull(abrev)
+  viz <- UFO %>% 
+  filter(country_new == "US", state == state_abv, str_detect(datetime, "2014")) %>% 
+  filter(longitude>= min(state_map$long) & latitude <=max(state_map$lat)) %>%
+  group_by(city) %>% 
+  mutate(city_frequency = n()) %>% 
+  ungroup() %>%
+  ggplot(aes(as.numeric(longitude), as.numeric(latitude))) +
+  geom_polygon(data = state_map, aes(x = long, y = lat), fill = NA, color = "black") +  # state borders
+  coord_equal() +
+  geom_point(aes(text = comments, size = city_frequency), colour = "red", alpha = 1/2)+
+    xlim(min(state_map$long), max(state_map$long))+ ylim(min(state_map$lat), max(state_map$lat)) +
+    theme_void() + theme(axis.line = element_blank())
+
+ggplotly(viz, tooltip = c("text", "size"))
+}
+
+```
+
+```{r}
+make_ufo_state_map_city(state_for_map = "texas")
+make_ufo_state_map_comments(state_for_map = "texas")
+```
+
