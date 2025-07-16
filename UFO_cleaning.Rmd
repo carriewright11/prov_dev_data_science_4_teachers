@@ -12,6 +12,7 @@ output:
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
+In this file we will show an example of data cleaning in R. You can click to see the code if you wish.
 
 ## Load our tools and data
 
@@ -39,23 +40,41 @@ Row 65125:https://docs.google.com/spreadsheets/d/1T2ix2WGEsBXlsnowuu9GRyBVBgbIzi
 
 These would have been hard to find in Excel or Google Sheets!
 
-# Examine the data
+## Examine the data
 
-R has many useful ways of viewing data. Say we want to see how many unique values there are for the categorical variables.
+Take a minute to look at a birds eye view of the data. This will show us the top few rows.
 
 ```{r}
-count(UFO, city) %>% datatable()
-count(UFO, state) %>% datatable()
-count(UFO, country)
-count(UFO, shape)%>% datatable()
+head(UFO)%>% datatable()
 ```
-We notice that not all of the column D `country` data is complete the 3rd row says `tx` but doesn't have a country value. 
+
+OK we have how many variables? What are they?
+
+<details> <summary> Answer </summary>
+
+We have 11 variables. There is info about the date and time of a UFO siting, there is info about the location including the city, state, and country, latitude and longitude, as well as info about the shape of the sighting, the comments people wrote about them, and the date that the sighting was posted to this dataset.
+
+</details>
+<br>
+
+R has many useful ways of viewing data. What makes it really special, is we can easily get summaries or subsets of the data that would be much more difficult in Google Sheets or Excel.
 
 
-If we look up "Lackland afb" we see that it is indeed a real air force base in Texas in the United States. 
+Say we want to see how many unique values there are for the country variable.
+
+```{r}
+count(UFO, country)
+```
+
+Nice, we can see that there are 5 different values and many rows that have `NA` for country.
+
+You may have noticed in the data preview that the second row of data says it is from the state `tx` for Texas but the country info is missing.
 
 
-Let's try to save these rows where we have state data but we dont have country data.
+If we look up "Lackland afb" - the value for the city variable - we see that it is indeed a real air force base in Texas in the United States. 
+
+
+Let's try to save these rows where we have state data but we don't have country data.
 
 We can use a list of state abbreviations that is already in R to do this! We will change the format so it matches the lowercase format in our data.
 
@@ -65,16 +84,15 @@ lower_states
 ```
 
 
-Let's take a look at more of these situations:
+Let's take a look at more of these situations so we can verify that we want to keep the data:
 
 ```{r}
-filter(UFO, state %in% lower_states & is.na(country)) %>% datatable()
+filter(UFO, state %in% lower_states & is.na(country)) %>% head() %>% datatable()
 ```
 
 
+
 Now let's make a new country column based on the state column and if it matches the values in this list of state abbreviations `lower_states` and if it doesn't match we will have it keep the original country column value (which will be useful for values from Australia etc.)
-
-
 
 ```{r}
 UFO <- UFO %>% mutate(
@@ -105,7 +123,7 @@ filter(UFO, country_new == "US") %>% nrow()
 
 Wow, we saved a lot of United States sightings from being missed!
 
-Now let's say we wanted only sightings from this October 2010 in the US. This could be kinda tricky in Excel or Google Sheets.
+Now let's say we wanted only sightings from this 2014 in the US. This could be kinda tricky in Excel or Google Sheets. In R we can detect a pattern of "2014" and filter for it without needing to aadjust the `datetime` variable.
 
 ```{r}
 US_2014 <-filter(UFO, str_detect(datetime, "2014") & country_new == "US")
