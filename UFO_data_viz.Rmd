@@ -35,6 +35,12 @@ ggplot(US_2014, aes(x = shape, fill = shape)) + geom_bar()+
   theme(legend.position = "none" , text = element_text(size = 15), axis.text.x = element_text(angle = 45))
 ```
 
+**Question**: What do you think of this plot? Are there ways in which it could be improved? How easy do you find it to interpret?
+<details> <summary>Possible Answer </summary>
+There are many shapes which makes it difficult to tell directly if there are any patterns. There are also similar shapes that could probably be grouped together. Since the bars are not arranged in any particular way, it is harder to tell which shapes are more common.
+</details>
+<br>
+
 We can see that many of these shapes are rather similar, like other, unknown,  and NA or oval. circle, disk, egg, and sphere, or even flash, light, and fireball. Let's simplify these categories but only do it just before the plot, let's not change our data.
 
 ```{r, fig.width=10}
@@ -81,6 +87,11 @@ US_2014 %>% group_by(state) %>% summarise(frequency = n()) %>% arrange(desc(freq
   
 ```
 
+**Question**: What do you observe in this plot?
+<details> <summary>Possible Answer</summary>
+It seems that most states have sightings. California has many sightings. Since it is a highly populated state, it could be that places that are generally more populated have more sightings. It would be good to look sat number of sightings per 10,0000 people are something. 
+</details>
+<br>
 
 Let's say we were really interested in NM because of Roswell. We could highlight NM specifically to be a different color.
 
@@ -110,6 +121,11 @@ ggplot() +geom_point(data =summarized_data, aes(y = frequency, x = hour))+
   theme( text = element_text(size = 15))
 ```
 
+**Question**: What do you think of this plot? Are there ways in which it could be improved? How easy do you find it to interpret?
+<details> <summary>Possible Answer </summary>
+If you aren't used to military time, you might struggle to read this plot a bit. 
+</details>
+<br>
 
 Let's change this so that the time values are more of what we might typically be used to. We can also add some color to indicate different timespans of the day. 
 
@@ -169,10 +185,17 @@ ggplot(data = us_map, aes(x = long, y = lat, group = group, fill = frequency)) +
   scale_fill_gradient(low = "lightblue", high = "darkblue", na.value = "white") + theme_void()
 ```
 
+**Question**: Anything peculiar about this plot?
+<details> <summary>Possible Answer </summary>
+One of the states doesn't have any data - Nebraska! - It would be good to look at missingness of our data. It could be that there just weren't any sightings in Nebraska in 2014, or maybe no one has yet added the data for this state for that year.
+</details>
+<br>
+
+
 
 How does this compare if we include all the dates in the dataset:
 
-```{r}
+```{r, fig.width=9}
 library(maps)
 state_sightings <- UFO %>% filter(country_new=="US") %>% group_by(state) %>% summarise(frequency = n())
 
@@ -196,6 +219,11 @@ ggplot(data = us_map, aes(x = long, y = lat, group = group, fill = frequency)) +
 
 ```
 
+**Question**: What patterns do you notice in this plot?
+<details> <summary>Possible Answer </summary>
+California has many more sightings. The west coast also seems to have generally more sightings.Again population could be playing some role in the rate of sightings in California, this could also have to do with cultural differences/beleifs about UFOs. If we compare our plot with a [heatmap of population](https://en.wikipedia.org/wiki/List_of_U.S._states_and_territories_by_population#/media/File:Population_by_U.S._state.svg) in 2022 we can see that they are quite similar. Again it would be good to add city or at least state population to our data to control for that to really evaluate state differences.
+</details>
+<br>
 
 Now we will add interactive features to our plot. First we will plot with text about one of the sightings comments for each city.
 
