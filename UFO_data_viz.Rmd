@@ -2,13 +2,19 @@
 title: "UFO Data Vizualization"
 author: "Carrie"
 date: "2025-07-09"
-output: html_document
+output: 
+  html_document:
+    code_folding: hide
 ---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
 
 ## Load our tools and data
 
 
-First we need to load our tools - including the tidyverse and also read in the data, which we can do directly from a link. 
+First we need to load our tools - including the tidyverse and also read in the data, which we can do directly in R. 
 
 ```{r}
 library(tidyverse)
@@ -24,13 +30,13 @@ Now let's make some plots and see what is possible in R.
 
 Perhaps we are curious about how often each of the different shapes of UFOs were sighted. 
 
-```{r}
+```{r, fig.width=9}
 ggplot(US_2014, aes(x = shape, fill = shape)) + geom_bar() 
 ```
 
 We can see that many of these shapes are rather similar, like other, unknown,  and NA or oval. circle, disk, egg, and sphere, or even flash, light, and fireball. Let's simplify these categories but only do it just before the plot, let's not change our data.
 
-```{r}
+```{r, fig.width=9}
 US_2014 %>% mutate(shape = case_when( 
               shape %in% c("circle", "disk", "egg", "oval", "sphere") ~ "circular",
               shape %in% c("flash", "light", "fireball") ~ "light/fire",
@@ -44,7 +50,7 @@ ggplot(aes(x = shape, fill = shape)) + geom_bar()
 
 Nice, let's also organize the columns.
 
-```{r}
+```{r, fig.width=9}
 library(forcats)
 US_2014 %>% mutate(shape = case_when( 
               shape %in% c("circle", "disk", "egg", "oval", "sphere") ~ "circular",
@@ -65,7 +71,7 @@ Now we can clearly see that most sightings have some sort of circular shape or a
 
 Next, maybe we are wondering which states have the most sightings.
 
-```{r}
+```{r, fig.width=9}
 US_2014 %>% group_by(state) %>% summarise(frequency = n()) %>% arrange(desc(frequency)) %>% mutate(percent = (frequency/sum(frequency)*100)) %>%
   ggplot(aes(x = as_factor(state), y = frequency))+ geom_col(fill = "blue") + theme_linedraw()+
   labs(x = "Frequency of UFO Sightings", y = "State")
@@ -74,7 +80,7 @@ US_2014 %>% group_by(state) %>% summarise(frequency = n()) %>% arrange(desc(freq
 
 
 Let's say we were really interested in NM becuase of Roswell.
-```{r}
+```{r, fig.width=9}
 
 US_2014 %>% group_by(state) %>% summarise(frequency = n()) %>% arrange(desc(frequency)) %>% mutate(percent = (frequency/sum(frequency)*100)) %>%
 mutate(fill_color = case_when(state =="nm" ~"nm", .default = "not_nm"))%>%
@@ -219,6 +225,7 @@ ggplotly(viz, tooltip = c("text", "size"))
 
 ```
 
+We cna make our plotting data into a function, so that we can just plug in the state we want and get a plot.
 
 ```{r}
 
@@ -263,8 +270,10 @@ ggplotly(viz, tooltip = c("text", "size"))
 
 ```
 
-```{r}
-make_ufo_state_map_city(state_for_map = "texas")
-make_ufo_state_map_comments(state_for_map = "texas")
+
+Let's try it for Louisiana.
+```{r, class.source = "fold-show"}
+make_ufo_state_map_city(state_for_map = "louisiana")
+make_ufo_state_map_comments(state_for_map = "louisiana")
 ```
 
