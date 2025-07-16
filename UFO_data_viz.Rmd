@@ -2,13 +2,19 @@
 title: "UFO Data Vizualization"
 author: "Carrie"
 date: "2025-07-09"
-output: html_document
+output: 
+  html_document:
+    code_folding: hide
 ---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
 
 ## Load our tools and data
 
 
-First we need to load our tools - including the tidyverse and also read in the data, which we can do directly from a link. 
+First we need to load our tools - including the tidyverse and also read in the data, which we can do directly in R. 
 
 ```{r}
 library(tidyverse)
@@ -24,27 +30,35 @@ Now let's make some plots and see what is possible in R.
 
 Perhaps we are curious about how often each of the different shapes of UFOs were sighted. 
 
-```{r}
-ggplot(US_2014, aes(x = shape, fill = shape)) + geom_bar() 
+```{r, fig.width=10}
+ggplot(US_2014, aes(x = shape, fill = shape)) + geom_bar()+
+  theme(legend.position = "none" , text = element_text(size = 15), axis.text.x = element_text(angle = 45))
 ```
+
+**Question**: What do you think of this plot? Are there ways in which it could be improved? How easy do you find it to interpret?
+<details> <summary>Possible Answer </summary>
+There are many shapes which makes it difficult to tell directly if there are any patterns. There are also similar shapes that could probably be grouped together. Since the bars are not arranged in any particular way, it is harder to tell which shapes are more common.
+</details>
+<br>
 
 We can see that many of these shapes are rather similar, like other, unknown,  and NA or oval. circle, disk, egg, and sphere, or even flash, light, and fireball. Let's simplify these categories but only do it just before the plot, let's not change our data.
 
-```{r}
+```{r, fig.width=10}
 US_2014 %>% mutate(shape = case_when( 
               shape %in% c("circle", "disk", "egg", "oval", "sphere") ~ "circular",
               shape %in% c("flash", "light", "fireball") ~ "light/fire",
-              shape %in% c("other", "unknown", NA)~ "NA",
+              shape %in% c("other", "unknown","formation") |is.na(shape) ~ "unknown",
               shape %in% c("cylinder", "cigar") ~ "cylindrical",
               .default = shape)) %>%
   
-ggplot(aes(x = shape, fill = shape)) + geom_bar() 
+ggplot(aes(x = shape, fill = shape)) + geom_bar() + 
+  theme(legend.position = "none" , text = element_text(size = 15))
 
 ```
 
 Nice, let's also organize the columns.
 
-```{r}
+```{r, fig.width=10}
 library(forcats)
 US_2014 %>% mutate(shape = case_when( 
               shape %in% c("circle", "disk", "egg", "oval", "sphere") ~ "circular",
@@ -56,7 +70,7 @@ US_2014 %>% mutate(shape = case_when(
   
 ggplot(aes(x = fct_reorder(shape, frequency), y = frequency, fill = shape)) + geom_col()+
   labs(x = "Shape of UFO", y = "Mumber of sightings", title = "Number of UFO sightings by shape")+ 
-  theme(legend.position = "none")
+  theme(legend.position = "none" , text = element_text(size = 15))
 
 ```
 
@@ -65,26 +79,91 @@ Now we can clearly see that most sightings have some sort of circular shape or a
 
 Next, maybe we are wondering which states have the most sightings.
 
-```{r}
+```{r, fig.width=10}
 US_2014 %>% group_by(state) %>% summarise(frequency = n()) %>% arrange(desc(frequency)) %>% mutate(percent = (frequency/sum(frequency)*100)) %>%
   ggplot(aes(x = as_factor(state), y = frequency))+ geom_col(fill = "blue") + theme_linedraw()+
-  labs(x = "Frequency of UFO Sightings", y = "State")
+  labs(x = "Frequency of UFO Sightings", y = "State") +
+  theme( text = element_text(size = 15), axis.text.x = element_text(angle = 60))
   
 ```
 
+**Question**: What do you observe in this plot?
+<details> <summary>Possible Answer</summary>
+It seems that most states have sightings. California has many sightings. Since it is a highly populated state, it could be that places that are generally more populated have more sightings. It would be good to look sat number of sightings per 10,0000 people are something. 
+</details>
+<br>
 
-Let's say we were really interested in NM becuase of Roswell.
-```{r}
+Let's say we were really interested in NM because of Roswell. We could highlight NM specifically to be a different color.
+
+```{r, fig.width=10}
 
 US_2014 %>% group_by(state) %>% summarise(frequency = n()) %>% arrange(desc(frequency)) %>% mutate(percent = (frequency/sum(frequency)*100)) %>%
 mutate(fill_color = case_when(state =="nm" ~"nm", .default = "not_nm"))%>%
   ggplot(aes(x = as_factor(state), y = frequency, fill = fill_color))+ geom_col() + theme_linedraw()+
-  labs(y = "Frequency of UFO Sightings", x = "State") + theme(legend.position = "none")
+  labs(y = "Frequency of UFO Sightings", x = "State") + theme(legend.position = "none" , text = element_text(size = 15), axis.text.x = element_text(angle = 60))
   
 ```
 
 
-```{r}
+We can also use R to look at when sightings typically occur.
+
+```{r, fig.width=8}
+UFO_time <-UFO %>% separate(datetime,into = c("date", "time"), sep = " ") %>% mutate(date = mdy(date)) %>% separate(time, into= c("hour", "min")) %>% mutate(hour = as.numeric(hour), min = as.numeric(min)) %>% filter(hour <=24)
+
+
+UFO_time <- UFO_time %>%   mutate(timespan = case_when(hour %in%c(18,19,20,21)~ "Evening", 
+                              hour >21 ~ "Night",
+                              hour >=0 & hour <12 ~ "Morning",
+                              hour >=12 & hour <18 ~ "Afternoon"))
+summarized_data <-UFO_time%>% group_by(hour, timespan) %>% summarize(frequency = n())
+
+ggplot() +geom_point(data =summarized_data, aes(y = frequency, x = hour))+
+  theme( text = element_text(size = 15))
+```
+
+**Question**: What do you think of this plot? Are there ways in which it could be improved? How easy do you find it to interpret?
+<details> <summary>Possible Answer </summary>
+If you aren't used to military time, you might struggle to read this plot a bit. 
+</details>
+<br>
+
+Let's change this so that the time values are more of what we might typically be used to. We can also add some color to indicate different timespans of the day. 
+
+```{r, fig.width=11}
+# Create a data frame for the rectangles
+rectangles <- data.frame(
+  xmin = c(0, 12, 18, 21),
+  xmax = c(12, 18, 21, 24),
+  ymin = 0,
+  ymax = max(summarized_data$frequency),
+  timespan = c("Morning", "Afternoon", "Evening", "Night")  # Adjust accordingly
+)
+
+
+# Plot
+
+summarized_data  <-mutate(summarized_data, time_regular = case_when(
+    hour == 0 ~ "12 AM",
+    hour < 12 ~ paste0(hour, " AM"),
+    hour == 12 ~ "12 PM",
+    TRUE ~ paste0(hour - 12, " PM")
+  ))
+
+summarized_data  <-summarized_data %>% mutate(time_regular = as.factor(time_regular))
+ggplot() +   geom_rect(data = rectangles, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = timespan), alpha = 0.2) + geom_point(data =summarized_data, aes(y = frequency, x = time_regular)) +
+  labs(x = "Hour", y = "Frequency") +
+  theme_linedraw() +
+  theme(legend.position = "bottom" , text = element_text(size = 15))
+
+
+```
+
+
+
+
+Now let's take a look at a map of sightings in 2014, R can easily allow us to create a heatmap.
+
+```{r, fig.width=9}
 library(maps)
 state_sightings <- US_2014 %>% group_by(state) %>% summarise(frequency = n())
 
@@ -106,51 +185,17 @@ ggplot(data = us_map, aes(x = long, y = lat, group = group, fill = frequency)) +
   scale_fill_gradient(low = "lightblue", high = "darkblue", na.value = "white") + theme_void()
 ```
 
+**Question**: Anything peculiar about this plot?
+<details> <summary>Possible Answer </summary>
+One of the states doesn't have any data - Nebraska! - It would be good to look at missingness of our data. It could be that there just weren't any sightings in Nebraska in 2014, or maybe no one has yet added the data for this state for that year.
+</details>
+<br>
 
-range of dates
-
-```{r}
-UFO_time <-UFO %>% separate(datetime,into = c("date", "time"), sep = " ") %>% mutate(date = mdy(date)) %>% separate(time, into= c("hour", "min")) %>% mutate(hour = as.numeric(hour), min = as.numeric(min)) %>% filter(hour <=24)
-
-
-UFO_time <- UFO_time %>%   mutate(timespan = case_when(hour %in%c(18,19,20,21)~ "Evening", 
-                              hour >21 ~ "Night",
-                              hour >=0 & hour <12 ~ "Morning",
-                              hour >=12 & hour <18 ~ "Afternoon"))
-summarized_data <-UFO_time%>% group_by(hour, timespan) %>% summarize(frequency = n())
-
-ggplot() +geom_point(data =summarized_data, aes(y = frequency, x = hour))
-
-# Create a data frame for the rectangles
-rectangles <- data.frame(
-  xmin = c(0, 12, 18, 21),
-  xmax = c(12, 18, 21, 24),
-  ymin = 0,
-  ymax = max(summarized_data$frequency),
-  timespan = c("Morning", "Afternoon", "Evening", "Night")  # Adjust accordingly
-)
-
-# Plot
-
-summarized_data  <-mutate(summarized_data, time_regular = case_when(
-    hour == 0 ~ "12 AM",
-    hour < 12 ~ paste0(hour, " AM"),
-    hour == 12 ~ "12 PM",
-    TRUE ~ paste0(hour - 12, " PM")
-  ))
-
-summarized_data  <-summarized_data %>% mutate(time_regular = as.factor(time_regular))
-ggplot() +   geom_rect(data = rectangles, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = timespan), alpha = 0.2)+geom_point(data =summarized_data, aes(y = frequency, x = time_regular))
-  labs(x = "Hour", y = "Frequency") +
-  theme_linedraw()
-
-
-```
 
 
 How does this compare if we include all the dates in the dataset:
 
-```{r}
+```{r, fig.width=9}
 library(maps)
 state_sightings <- UFO %>% filter(country_new=="US") %>% group_by(state) %>% summarise(frequency = n())
 
@@ -174,6 +219,13 @@ ggplot(data = us_map, aes(x = long, y = lat, group = group, fill = frequency)) +
 
 ```
 
+**Question**: What patterns do you notice in this plot?
+<details> <summary>Possible Answer </summary>
+California has many more sightings. The west coast also seems to have generally more sightings.Again population could be playing some role in the rate of sightings in California, this could also have to do with cultural differences/beleifs about UFOs. If we compare our plot with a [heatmap of population](https://en.wikipedia.org/wiki/List_of_U.S._states_and_territories_by_population#/media/File:Population_by_U.S._state.svg) in 2022 we can see that they are quite similar. Again it would be good to add city or at least state population to our data to control for that to really evaluate state differences.
+</details>
+<br>
+
+Now we will add interactive features to our plot. First we will plot with text about one of the sightings comments for each city.
 
 ```{r}
 library(plotly)
@@ -203,7 +255,12 @@ viz <- UFO %>%
 
 ggplotly(viz, tooltip = c("text", "size"))
 
+```
 
+
+Or we will add text about the frequency within the city.
+
+```{r}
 
 viz <- UFO %>% 
   filter(country_new == "US", state == "md", str_detect(datetime, "2014")) %>% 
@@ -219,6 +276,7 @@ ggplotly(viz, tooltip = c("text", "size"))
 
 ```
 
+We can also make our plot code into a function, so that we can just plug in the state we want and get an interactive plot!
 
 ```{r}
 
@@ -263,8 +321,11 @@ ggplotly(viz, tooltip = c("text", "size"))
 
 ```
 
-```{r}
-make_ufo_state_map_city(state_for_map = "texas")
-make_ufo_state_map_comments(state_for_map = "texas")
+
+Now ket's try it for Louisiana. We only need a single line of code for each plot! We could even make this into an app so people could interactively pick their state of interest.
+
+```{r, class.source = "fold-show"}
+make_ufo_state_map_city(state_for_map = "louisiana")
+make_ufo_state_map_comments(state_for_map = "louisiana")
 ```
 
