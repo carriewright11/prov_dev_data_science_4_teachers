@@ -1,0 +1,27 @@
+---
+title: "UFO Data Analysis"
+author: "Carrie Wright"
+date: "2025-06-24"
+output: 
+  html_document:
+    code_folding: hide
+    
+---
+
+We previously saw that population might be impacting the number of sightings. We will now get some data to check that. A package called `tidycensus` can be very helpful for getting this kind of data.
+
+## Load our tools and data
+
+
+First we need to load our tools - including the tidyverse and also read in the data, which we can do directly in R. 
+
+```{r}
+library(tidyverse)
+library(tidycensus)
+library(DT)
+UFO <- read_rds("UFO_clean.rds")
+US_2014 <- read_rds("UFO_2014.rds")
+lower_states <- read_rds("lower_states.rds")
+```
+
+
