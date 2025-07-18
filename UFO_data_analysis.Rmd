@@ -1,12 +1,13 @@
 ---
 title: "UFO Data Analysis"
-author: "Carrie Wright"
-date: "2025-06-24"
 output: 
   html_document:
     code_folding: hide
-    
 ---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
 
 We previously saw that population might be impacting the number of sightings. We will now get some data to check that. A package called `tidycensus` can be very helpful for getting this kind of data.
 
@@ -19,9 +20,125 @@ First we need to load our tools - including the tidyverse and also read in the d
 library(tidyverse)
 library(tidycensus)
 library(DT)
+library(readxl)
 UFO <- read_rds("UFO_clean.rds")
 US_2014 <- read_rds("UFO_2014.rds")
 lower_states <- read_rds("lower_states.rds")
+state_names <- tibble(state = tolower(state.name), abrev = tolower(state.abb))
+```
+First let's get some data about population.
+
+Found some here: https://www.census.gov/data/tables/time-series/demo/popest/intercensal-2010-2020-state.html
+
+https://www2.census.gov/programs-surveys/popest/tables/2010-2020/intercensal/national/nst-est2020int-pop.xlsx
+```{r}
+#download.file("https://www2.census.gov/programs-surveys/popest/tables/2010-2020/intercensal/national/nst-est2020int-pop.xlsx", destfile = "pop.xlsx")
+pop_data <- read_excel("pop.xlsx", skip = 3)
+```
+```{r}
+library(maps)
+pop_data <-rename(pop_data, "Location" = `...1`)
+pop_data <-pop_data %>% filter(str_detect(Location, "^\\."))
+pop_data <- pop_data %>% mutate(Location = str_remove(Location, pattern = "."))
+pop_data <- pop_data %>% mutate(Location = tolower(Location))
+
+pop_data <-full_join(pop_data, state_names, by = c("Location"  = "state"))
+
+pop_data_2014 <- select(pop_data, Location, `2014`, abrev)
+
+pop_data_2014  <- pop_data_2014 %>% rename("population" = `2014`)
+US_2014_summ<-US_2014 %>% group_by(state) %>% summarize( frequency = n())
+US_2014_pop <-left_join(US_2014_summ, pop_data_2014, by = c("state" = "abrev"))
+
+US_2014_pop <-US_2014_pop %>% mutate(sightings_per_100000 = frequency/population*100000)
+head(US_2014_pop)
+
 ```
 
 
+Let's see if frequency of sightings and population are correlated.
+```{r}
+
+cor.test(US_2014_pop$frequency, US_2014_pop$population)
+
+
+```
+**Question**: How do you interpret this analysis?
+<details> <summary>Possible Answer </summary>
+ We have a fairly strong and positive correlation of 0.8. 
+</details>
+<br>
+
+```{r}
+ggplot(US_2014_pop, aes(population, frequency)) + geom_point()+ geom_smooth(method = "lm")
+
+```
+
+The graph confirms what we saw from our correlation test.
+
+Let's take a look at our plot now"
+
+```{r}
+us_map <- map_data("state")
+us_map <- us_map %>%
+  full_join(US_2014_pop, by = c("region" = "Location"))
+
+ggplot(data = us_map, aes(x = long, y = lat, group = group, fill = sightings_per_100000)) +
+  geom_polygon(color = "white") +
+  coord_fixed(1.3) +
+  theme_minimal() +
+  labs(title = "UFO Sightings in the US in 2014", fill = "Number of Sightings for every 100,000 people") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", na.value = "white") + theme_void()
+```
+
+Here are the top 10 states in 2014:
+
+```{r}
+US_2014_pop %>% arrange(desc(sightings_per_100000)) %>% head(n= 10)
+
+```
+
+What about from 2010-2014?
+
+```{r}
+UFO_us <-UFO %>% filter(country_new == "US")
+UFO_us <-UFO_us %>% separate(datetime, into = c("date", "time"), sep = " ")
+UFO_us <-UFO_us %>% mutate(date = mdy(date)) %>% mutate(year = year(date))%>% glimpse()
+
+UFO_us<- UFO_us %>% filter(year %in%  c(2010,2011,2012,2013,2014))
+
+UFO_us_summ <-UFO_us %>%group_by(year, state) %>% summarize(frequency = n())
+
+pop_data_long <-pivot_longer(pop_data, cols = -c(abrev, Location), names_to = "year", values_to = "population")
+pop_data_long  <- pop_data_long  %>% mutate(year = as.numeric(year))
+  
+UFO_US_pop <-left_join(UFO_us_summ, pop_data_long, by =  c("state" = "abrev", "year" = "year" ))
+UFO_US_pop <-UFO_US_pop %>% mutate(sightings_per_100000 = frequency/population*100000)
+```
+
+**Question**: How has the plot changed?
+<details> <summary>Answer </summary>
+ We can see that california is not as different compared to the other states as before. We can also see that New Mexico is darker. This indicates that for California, a higher population was leading to leading to more sightings, on the flip side for New Mexico, the low population of the state was leading to less sightings. However when we accounted for population we could see that the picture looked much different for these states.
+</details>
+<br>
+
+```{r}
+US_sum <-UFO_US_pop %>% group_by(Location) %>% summarize(mean_sightings = mean(sightings_per_100000))
+us_map <- map_data("state")
+us_map <-full_join(us_map, US_sum, by = c("region" = "Location"))
+
+ggplot(data = us_map, aes(x = long, y = lat, group = group, fill = mean_sightings)) +
+  geom_polygon(color = "white") +
+  coord_fixed(1.3) +
+  theme_minimal() +
+  labs(title = "UFO Sightings in the US 2010-2014", fill = "Number of Sightings for every 100,000 people") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", na.value = "white") + theme_void()
+```
+
+
+Here are the top 10 states overall:
+
+```{r}
+US_sum %>% arrange(desc(mean_sightings)) %>% head(n= 10)
+
+```
